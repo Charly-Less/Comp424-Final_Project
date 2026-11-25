@@ -43,17 +43,67 @@ class StudentAgent(Agent):
 
     def line_potential(self,board,player,opponent):
         """Sums the line_potential for all lines"""
-
-
         owners, sizes = top_view(board)
         score = 0
         for line in LINES[WIN_LENGTH]:
             score += self.compute_line_potential(line,owners,player,opponent)
         return score  
     
+    def largest_in_reserve(self, reserves, who):
+        """Largest piece size 'who' can still place"""
+        for s in (LARGE, MEDIUM, SMALL):
+            if reserves[who, s] > 0:
+                return s
+        return -1
+    
+    def count_threats(self, owners, sizes, reserves, who, other):
+        """Lines where 'who' has 3 and can complete the 4th next turn."""
+        n = 0 # number of threats
+        biggest = self.largest_in_reserve(reserves, who)
+        for line in LINES[WIN_LENGTH]: # List of every possible winning line on the board
+            cells = [owners[r,c] for r,c in line] # owners = who owns top piece on each square
+            if OBSTACLE in cells or cells.count(who) != 3: # OBSTACLE = blocked square
+                continue
+            r,c = next((r,c) for r,c in line if owners[r,c] != who)
+            if owners[r,c] == EMPTY:
+                n += 1
+            elif owners[r,c] == other and sizes[r,c] < biggest: # opponents piece is on top of 4th square and their piece is smaller than the largest pieces who has in reserve 
+                n += 1
+        return n
+    
+    def threat_score(self, owners, sizes, reserves, player, opponent):
+        mine = self.count_threats(owners, sizes, reserves, player, opponent)
+        theirs = self.count_threats(owners, sizes, reserves, opponent, player)
+        score = 50 * mine - 60 * theirs
+        if mine >= 2:
+            score += 200
+        if theirs >= 2:
+            score -=250
+        return score
+    
+
+    def uncover_risk(self, board, owners, sizes, player, opponent):
+        """Penalty for our top pieces that are stuck covering opponent where they can win."""
+        penalty = 0
+        for line in LINES[WIN_LENGTH]: # Go through all 10 possible winning lines
+            cells = [owners[r,c] for r,c in line] # Make a list of who owns the top of each of the line's 4 squares
+            if OBSTACLE in cells or cells.count(opponent) != 3: # Skip if they don't have 3 of 4 squares, or if the obstacle is there
+                continue
+            r,c = next((r,c) for r,c in line if owners[r,c] != opponent) # Find 4th square and store its row and column 
+            if owners[r,c] != player: # If 4th square isn't yours on top, skip
+                continue
+            below = [board[r,c,s] for s in range(sizes[r,c]) if board[r,c,s] != EMPTY] # List the pieces under your top piece - if large covers Brown's small, below = [2]
+            if below and below[-1] == opponent: # Checks if something underneath at all, below[-1] is the biggest piece under yours, if opponents lifting would complete their line
+                penalty -= 30 
+        return penalty
+
+
+
+    
     def evaluate(self,board,reserves,player,opponent):
-        """Overall evaluation function. For now, it is just line potential"""
-        return self.line_potential(board,player,opponent)
+        """Overall evaluation function."""
+        owners, sizes = top_view(board)
+        return self.line_potential(board,player,opponent) + self.threat_score(owners, sizes, reserves, player, opponent) + self.uncover_risk(board, owners, sizes, player, opponent)
 
     def minimax(self,board,reserves, depth, alpha, beta, current_player, root_player):
         """Minimax with alpha-beta pruning"""
