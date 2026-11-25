@@ -23,7 +23,7 @@ class StudentAgent(Agent):
 
         my_count = 0
         opp_count = 0
-        multiplier = [0,5,20,100]
+        multiplier = [0,5,20,100,500]
         for r,c in line:
             if owners[r,c] == OBSTACLE:
                 return 0
@@ -134,6 +134,7 @@ class StudentAgent(Agent):
                player, opponent - your player number (1 or 2) and the other one.
         Agent.step in agents/agent.py explains each argument and the time limit.
         """
+        #print("RUNNING STUDENT_AGENT")
         start = time.perf_counter()
         # ALLOW_MOVES and WIN_LENGTH (from constants) are the rule flags of this game.
         # helpers.get_valid_moves / check_winner already respect them; your own
